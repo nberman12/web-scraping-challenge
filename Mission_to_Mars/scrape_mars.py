@@ -6,12 +6,11 @@ import requests
 import time
 import re
 
-def init_browser():
-    executable_path = {'executable_path': 'chromedriver.exe'}
-    return Browser('chrome', **executable_path, headless=False)
 
 def scrape():
-    browser=init_browser()
+    executable_path = {'executable_path': 'chromedriver.exe'}
+    browser = Browser('chrome', **executable_path, headless=False)
+    
     mars_data={}
 
     #Nasa Mars Site
@@ -20,10 +19,14 @@ def scrape():
     nasa_html=browser.html
     nasa_soup=BeautifulSoup(nasa_html,'html.parser')
 
-    news_list = nasa_soup.find('ul', class_='item_list')
-    first_item = news_list.find('li', class_='slide')
-    news_title = first_item.find('div', class_='content_title').text
-    news_p = first_item.find('div', class_='article_teaser_body').text
+    #Find latest article w. Title and paragraph
+    slide=nasa_soup.find('li',class_='slide')
+    result=slide.find_all('div', class_="content_title")
+
+    news_title=result[0].get_text()
+
+    news_p=nasa_soup.find('div',class_='article_teaser_body').text
+
 
     mars_data['nasa_headline']=news_title
     mars_data['nasa_teaser']=news_p
@@ -69,38 +72,34 @@ def scrape():
 
     #Mars Hemispheres
     mars_hemisphere_url = 'https://astrogeology.usgs.gov/search/results?q=hemisphere+enhanced&k1=target&v1=Mars'
-    hemi_dicts = []
-
-    for i in range(1,9,2):
-        hemi_dict = {}
-        
-        browser.visit(mars_hemisphere_url)
-        time.sleep(1)
-        hemispheres_html = browser.html
-        hemispheres_soup = BeautifulSoup(hemispheres_html, 'html.parser')
-        hemi_name_links = hemispheres_soup.find_all('a', class_='product-item')
-        hemi_name = hemi_name_links[i].text.strip('Enhanced')
-        
-        detail_links = browser.find_by_css('a.product-item')
-        detail_links[i].click()
-        time.sleep(1)
-        browser.find_link_by_text('Sample').first.click()
-        time.sleep(1)
-        browser.windows.current = browser.windows[-1]
-        hemi_img_html = browser.html
-        browser.windows.current = browser.windows[0]
-        browser.windows[-1].close()
-        
-        hemi_img_soup = BeautifulSoup(hemi_img_html, 'html.parser')
-        hemi_img_path = hemi_img_soup.find('img')['src']
-
-        hemi_dict['title']=hemi_name.strip()
-        hemi_dict['img_url']=hemi_img_path
-
-        hemi_dicts.append(hemi_dict)
     
-    mars_data['hemisphere_imgs']=hemi_dicts
+    browser.visit(mars_hemisphere_url)
+    hemi_soup=BeautifulSoup(browser.html,"html.parser")
+
+    links=hemi_soup.find_all('h3')
+
+    hemisphere_img_urls=[]
+
+    for i in range(len(links)):
+        hemi_dict ={}
+        browser.find_by_tag('h3')[i].click()
+        time.sleep(1)
+        soup = BeautifulSoup(browser.html, 'html.parser')
+        initial =soup.find('h2', class_='title')
+        title = initial.text
+        hemi_dict['title'] = title
+        img_url = soup.select_one('img.wide-image').get('src')
+        hemi_dict['img_url'] = img_url
+        browser.back()
+        time.sleep(1)
+        hemisphere_img_urls.append(hemi_dict)
+
+    mars_data['hemisphere_imgs']=hemisphere_img_urls
+
 
     browser.quit()
 
     return mars_data
+
+if __name__ == "__main__":
+    print(scrape())
